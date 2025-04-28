@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>勤務記録アプリ Yui</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button { font-size: 20px; margin: 10px; padding: 10px 20px; }
+    #record { margin-top: 30px; }
+  </style>
+</head>
+<body>
+
+<h1>勤務記録 Yui</h1>
+
+<button id="clockInBtn">出勤</button>
+<button id="clockOutBtn">退勤</button>
+
+<div id="record">
+  <h2>今日の勤務記録</h2>
+  <p id="startTime">出勤時間: -</p>
+  <p id="endTime">退勤時間: -</p>
+  <p id="workDuration">勤務時間: -</p>
+</div>
+
+<script>
+  let startTime = null;
+  let endTime = null;
+
+  document.getElementById('clockInBtn').onclick = () => {
+    startTime = new Date();
+    document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
+  };
+
+  document.getElementById('clockOutBtn').onclick = () => {
+    if (!startTime) {
+      alert('まず出勤ボタンを押してください！');
+      return;
+    }
+    endTime = new Date();
+    document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
+
+    const diffMs = endTime - startTime;
+    const diffHrs = (diffMs / (1000 * 60 * 60)).toFixed(2);
+    document.getElementById('workDuration').innerText = `勤務時間: ${diffHrs} 時間`;
+  };
+</script>
+
+</body>
+</html>
