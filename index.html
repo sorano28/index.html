@@ -99,5 +99,19 @@
     let html = "<h3>仕事内容ごとの勤務時間</h3><ul>";
     let totalHours = 0;
     for (const task in taskHistory) {
-      const hours = taskHistory[task].to
+      const hours = taskHistory[task].toFixed(2);
+      html += `<li>${task}: ${hours}時間</li>`;
+      totalHours += parseFloat(hours);
+    }
+    html += "</ul>";
+
+    // 休憩時間引く
+    totalHours = totalHours - (breakMinutes / 60);
+    document.getElementById('taskLog').innerHTML = html;
+    document.getElementById('workDuration').innerText = `総勤務時間: ${totalHours.toFixed(2)} 時間（休憩引いた後）`;
+  }
+</script>
+
+</body>
+</html>
 
