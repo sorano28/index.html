@@ -5,9 +5,8 @@
   <title>勤務記録アプリ Yui</title>
   <style>
     body { font-family: sans-serif; padding: 20px; }
-    button { font-size: 20px; margin: 10px; padding: 10px 20px; }
-    #record { margin-top: 30px; }
-    #jobs { margin-top: 20px; display: none; }
+    button { font-size: 20px; margin: 5px; padding: 10px 20px; }
+    #record, #taskButtons, #breakInput { margin-top: 30px; }
   </style>
 </head>
 <body>
@@ -17,41 +16,44 @@
 <button id="clockInBtn">出勤</button>
 <button id="clockOutBtn">退勤</button>
 
-<div id="jobs">
-  <h2>仕事内容を選んでください</h2>
-  <button class="jobBtn">外来</button>
-  <button class="jobBtn">病棟</button>
-  <button class="jobBtn">手術</button>
-  <button class="jobBtn">救急</button>
-  <button class="jobBtn">事務</button>
+<div id="taskButtons" style="display:none;">
+  <h2>仕事内容選択</h2>
+  <button onclick="startTask('外来')">外来</button>
+  <button onclick="startTask('病棟')">病棟</button>
+  <button onclick="startTask('手術')">手術</button>
+  <button onclick="startTask('救急')">救急</button>
+  <button onclick="startTask('事務')">事務</button>
+</div>
+
+<div id="breakInput" style="display:none;">
+  <h2>休憩時間</h2>
+  <input type="number" id="breakMinutes" placeholder="休憩時間（分）">
+  <button onclick="setBreakTime()">休憩時間を記録</button>
 </div>
 
 <div id="record">
   <h2>今日の勤務記録</h2>
   <p id="startTime">出勤時間: -</p>
-  <p id="selectedJob">仕事内容: -</p>
   <p id="endTime">退勤時間: -</p>
-  <p id="workDuration">勤務時間: -</p>
+  <div id="taskLog"></div>
+  <p id="breakTime">休憩時間: -</p>
+  <p id="workDuration">総勤務時間: -</p>
 </div>
 
 <script>
   let startTime = null;
   let endTime = null;
-  let selectedJob = null;
+  let currentTask = null;
+  let currentTaskStart = null;
+  let taskHistory = {};
+  let breakMinutes = 0;
 
   document.getElementById('clockInBtn').onclick = () => {
     startTime = new Date();
     document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
-    document.getElementById('jobs').style.display = 'block';
+    document.getElementById('taskButtons').style.display = 'block';
+    document.getElementById('breakInput').style.display = 'block';
   };
-
-  const jobButtons = document.querySelectorAll('.jobBtn');
-  jobButtons.forEach(btn => {
-    btn.onclick = () => {
-      selectedJob = btn.innerText;
-      document.getElementById('selectedJob').innerText = `仕事内容: ${selectedJob}`;
-    }
-  });
 
   document.getElementById('clockOutBtn').onclick = () => {
     if (!startTime) {
@@ -61,11 +63,41 @@
     endTime = new Date();
     document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
 
-    const diffMs = endTime - startTime;
-    const diffHrs = (diffMs / (1000 * 60 * 60)).toFixed(2);
-    document.getElementById('workDuration').innerText = `勤務時間: ${diffHrs} 時間`;
-  };
-</script>
+    if (currentTask) {
+      recordTaskTime(currentTask);
+    }
 
-</body>
-</html>
+    showTaskSummary();
+  };
+
+  function startTask(taskName) {
+    if (currentTask) {
+      recordTaskTime(currentTask);
+    }
+    currentTask = taskName;
+    currentTaskStart = new Date();
+  }
+
+  function recordTaskTime(taskName) {
+    const now = new Date();
+    const diffMs = now - currentTaskStart;
+    const diffHrs = diffMs / (1000 * 60 * 60);
+
+    if (!taskHistory[taskName]) {
+      taskHistory[taskName] = 0;
+    }
+    taskHistory[taskName] += diffHrs;
+  }
+
+  function setBreakTime() {
+    const input = document.getElementById('breakMinutes').value;
+    breakMinutes = parseInt(input) || 0;
+    document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
+  }
+
+  function showTaskSummary() {
+    let html = "<h3>仕事内容ごとの勤務時間</h3><ul>";
+    let totalHours = 0;
+    for (const task in taskHistory) {
+      const hours = taskHistory[task].to
+
