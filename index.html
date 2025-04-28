@@ -7,6 +7,7 @@
     body { font-family: sans-serif; padding: 20px; }
     button { font-size: 20px; margin: 10px; padding: 10px 20px; }
     #record { margin-top: 30px; }
+    #jobs { margin-top: 20px; display: none; }
   </style>
 </head>
 <body>
@@ -16,9 +17,19 @@
 <button id="clockInBtn">出勤</button>
 <button id="clockOutBtn">退勤</button>
 
+<div id="jobs">
+  <h2>仕事内容を選んでください</h2>
+  <button class="jobBtn">外来</button>
+  <button class="jobBtn">病棟</button>
+  <button class="jobBtn">手術</button>
+  <button class="jobBtn">救急</button>
+  <button class="jobBtn">事務</button>
+</div>
+
 <div id="record">
   <h2>今日の勤務記録</h2>
   <p id="startTime">出勤時間: -</p>
+  <p id="selectedJob">仕事内容: -</p>
   <p id="endTime">退勤時間: -</p>
   <p id="workDuration">勤務時間: -</p>
 </div>
@@ -26,11 +37,21 @@
 <script>
   let startTime = null;
   let endTime = null;
+  let selectedJob = null;
 
   document.getElementById('clockInBtn').onclick = () => {
     startTime = new Date();
     document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
+    document.getElementById('jobs').style.display = 'block';
   };
+
+  const jobButtons = document.querySelectorAll('.jobBtn');
+  jobButtons.forEach(btn => {
+    btn.onclick = () => {
+      selectedJob = btn.innerText;
+      document.getElementById('selectedJob').innerText = `仕事内容: ${selectedJob}`;
+    }
+  });
 
   document.getElementById('clockOutBtn').onclick = () => {
     if (!startTime) {
