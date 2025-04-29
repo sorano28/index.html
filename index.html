@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>勤務記録アプリ Yui 最強版</title>
+  <title>勤務記録アプリ Yui 完成版</title>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
@@ -314,6 +314,8 @@ function drawWeeklyWorkChart() {
     backgroundColor: colors[task]
   }));
 
+  let totalWeekHours = 0;
+
   const today = new Date();
   for (let d = 6; d >= 0; d--) {
     const date = new Date(today);
@@ -322,11 +324,16 @@ function drawWeeklyWorkChart() {
     labels.push(dateStr);
 
     const saved = JSON.parse(localStorage.getItem(`yui_${dateStr}`)) || { taskHistory: {} };
+    let dayTotal = 0;
     taskTypes.forEach((task, index) => {
       const hours = saved.taskHistory[task] || 0;
       datasets[index].data.push(hours.toFixed(2));
+      dayTotal += hours;
     });
+    totalWeekHours += dayTotal;
   }
+
+  const averageHours = (totalWeekHours / 7).toFixed(2);
 
   if (workChart) workChart.destroy();
 
@@ -340,7 +347,11 @@ function drawWeeklyWorkChart() {
     options: {
       responsive: true,
       plugins: {
-        legend: { position: 'top' }
+        legend: { position: 'top' },
+        title: {
+          display: true,
+          text: `1日あたりの平均勤務時間：${averageHours}時間`
+        }
       },
       scales: {
         x: { stacked: true },
