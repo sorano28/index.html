@@ -3,11 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>勤務記録アプリ Yui 完成版</title>
+  <title>Yui 勤務記録アプリ</title>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCPIj0_5mQ1sF6oymutLF3DUUaI2Uxw5pA",
+      authDomain: "yuiapp-4836a.firebaseapp.com",
+      projectId: "yuiapp-4836a",
+      storageBucket: "yuiapp-4836a.firebasestorage.app",
+      messagingSenderId: "561964130838",
+      appId: "1:561964130838:web:027b456703d0556b6f4b37",
+      measurementId: "G-XB8H2BHHK2"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+  </script>
+
   <style>
     body {
       font-family: 'Zen Maru Gothic', sans-serif;
@@ -17,56 +39,6 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-    }
-    h1 {
-      font-size: 28px;
-      margin-bottom: 10px;
-    }
-    #buttonRow {
-      display: flex;
-      justify-content: center;
-      gap: 20px;
-      margin-top: 10px;
-    }
-    #clockInBtn, #clockOutBtn {
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-      font-size: 16px;
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 1px 1px 4px rgba(0,0,0,0.2);
-      border: none;
-      cursor: pointer;
-    }
-    #clockInBtn {
-      background-color: #4caf50;
-      color: white;
-    }
-    #clockOutBtn {
-      background-color: #f44336;
-      color: white;
-    }
-    #taskButtons button {
-      background-color: #03a9f4;
-      color: white;
-      margin: 5px 0;
-      padding: 12px;
-      border: none;
-      border-radius: 8px;
-      width: 90%;
-      max-width: 300px;
-    }
-    #taskButtons button.active {
-      background-color: #0288d1;
-    }
-    input {
-      padding: 10px;
-      font-size: 16px;
-      width: 90%;
-      max-width: 200px;
     }
     .box {
       margin-top: 16px;
@@ -78,15 +50,10 @@
       max-width: 400px;
       text-align: center;
     }
-    ul {
-      text-align: left;
-      margin-top: 10px;
-      padding-left: 1em;
-    }
-    #calendar {
-      margin-top: 20px;
-      width: 90%;
-      max-width: 600px;
+    button {
+      margin: 4px;
+      padding: 10px 16px;
+      font-size: 16px;
     }
     canvas {
       margin-top: 30px;
@@ -95,272 +62,66 @@
     }
   </style>
 </head>
-<body>
+<body style="display:none;">
 
-<h1>勤務記録 Yui</h1>
-
-<div id="buttonRow">
-  <button id="clockInBtn">出勤</button>
-  <button id="clockOutBtn">退勤</button>
+<!-- ログイン画面 -->
+<div id="loginBox" class="box">
+  <h2>ログイン or 新規登録</h2>
+  <input type="email" id="email" placeholder="メールアドレス"><br><br>
+  <input type="password" id="password" placeholder="パスワード"><br><br>
+  <button onclick="login()">ログイン</button>
+  <button onclick="signup()">新規登録</button>
 </div>
 
-<div id="taskButtons" class="box" style="display:none;">
-  <h2>仕事内容選択</h2>
-  <button onclick="startTask('外来', this)">外来</button>
-  <button onclick="startTask('病棟', this)">病棟</button>
-  <button onclick="startTask('手術', this)">手術</button>
-  <button onclick="startTask('救急', this)">救急</button>
-  <button onclick="startTask('事務', this)">事務</button>
+<!-- アプリ本体 -->
+<div id="appContainer" style="display:none;">
+  <h1>Yui 勤務記録アプリ</h1>
+  <div id="recordBox" class="box">
+    <p>ここに勤務記録のUIや記録ボタンなどを置いていく予定！</p>
+    <!-- 必要ならここに勤務UIを追加してOK -->
+  </div>
+
+  <!-- グラフ -->
+  <canvas id="weeklyWorkChart"></canvas>
+  <canvas id="monthlyWorkChart"></canvas>
 </div>
-
-<div id="breakInput" class="box" style="display:none;">
-  <h2>休憩時間</h2>
-  <input type="number" id="breakMinutes" placeholder="休憩（分）">
-  <button onclick="setBreakTime()">休憩時間を記録</button>
-</div>
-
-<div id="record" class="box">
-  <h2>今日の勤務記録</h2>
-  <p id="startTime">出勤時間: -</p>
-  <p id="endTime">退勤時間: -</p>
-  <div id="taskLog"></div>
-  <p id="breakTime">休憩時間: -</p>
-  <p id="workDuration">総勤務時間: -</p>
-</div>
-
-<div id="calendar" class="box"></div>
-
-<div id="selectedRecord" class="box" style="display:none;">
-  <h2>選択した日の記録</h2>
-  <p id="selectedDate">日付: -</p>
-  <div id="selectedDetails"></div>
-</div>
-
-<canvas id="weeklyWorkChart"></canvas>
 
 <script>
-let startTime = null;
-let endTime = null;
-let currentTask = null;
-let currentTaskStart = null;
-let taskHistory = {};
-let breakMinutes = 0;
-const taskButtons = document.querySelectorAll('#taskButtons button');
-let calendar;
-let workChart;
-
-document.addEventListener('DOMContentLoaded', function() {
-  initCalendar();
-  loadTodayData();
-  drawWeeklyWorkChart();
-});
-
-function getTodayKey() {
-  const today = new Date();
-  return today.toISOString().split('T')[0];
-}
-
-function initCalendar() {
-  const calendarEl = document.getElementById('calendar');
-  calendar = new FullCalendar.Calendar(calendarEl, {
-    initialView: 'dayGridMonth',
-    locale: 'ja',
-    headerToolbar: {
-      left: 'prev,next today',
-      center: 'title',
-      right: ''
-    },
-    dateClick: function(info) {
-      showRecord(info.dateStr);
-    },
-    events: loadEvents()
-  });
-  calendar.render();
-}
-
-function loadEvents() {
-  const events = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key.startsWith('yui_')) {
-      const date = key.replace('yui_', '');
-      events.push({ title: '勤務あり', start: date });
-    }
-  }
-  return events;
-}
-
-document.getElementById('clockInBtn').onclick = () => {
-  startTime = new Date();
-  document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
-  document.getElementById('taskButtons').style.display = 'block';
-  document.getElementById('breakInput').style.display = 'block';
-  saveTodayData();
-};
-
-document.getElementById('clockOutBtn').onclick = () => {
-  if (!startTime) {
-    alert('まず出勤ボタンを押してください！');
-    return;
-  }
-  endTime = new Date();
-  document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
-  if (currentTask) recordTaskTime(currentTask);
-  showTaskSummary();
-  saveTodayData();
-  calendar.removeAllEvents();
-  calendar.addEventSource(loadEvents());
-  drawWeeklyWorkChart();
-};
-
-function startTask(taskName, btn) {
-  if (currentTask) recordTaskTime(currentTask);
-  currentTask = taskName;
-  currentTaskStart = new Date();
-  taskButtons.forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  saveTodayData();
-}
-
-function recordTaskTime(taskName) {
-  const now = new Date();
-  const diffHrs = (now - currentTaskStart) / (1000 * 60 * 60);
-  if (!taskHistory[taskName]) taskHistory[taskName] = 0;
-  taskHistory[taskName] += diffHrs;
-}
-
-function setBreakTime() {
-  breakMinutes = parseInt(document.getElementById('breakMinutes').value) || 0;
-  document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
-  saveTodayData();
-}
-
-function showTaskSummary() {
-  let html = "<h3>仕事内容ごとの勤務時間</h3><ul>";
-  let total = 0;
-  for (const task in taskHistory) {
-    const hours = taskHistory[task].toFixed(2);
-    html += `<li>${task}: ${hours}時間</li>`;
-    total += parseFloat(hours);
-  }
-  html += "</ul>";
-  total -= breakMinutes / 60;
-  document.getElementById('taskLog').innerHTML = html;
-  document.getElementById('workDuration').innerText = `総勤務時間: ${total.toFixed(2)} 時間（休憩引いた後）`;
-}
-
-function saveTodayData() {
-  const key = getTodayKey();
-  const data = {
-    startTime: startTime ? startTime.toISOString() : null,
-    endTime: endTime ? endTime.toISOString() : null,
-    taskHistory, breakMinutes
-  };
-  localStorage.setItem(`yui_${key}`, JSON.stringify(data));
-}
-
-function loadTodayData() {
-  const key = getTodayKey();
-  const saved = JSON.parse(localStorage.getItem(`yui_${key}`));
-  if (!saved) return;
-  if (saved.startTime) {
-    startTime = new Date(saved.startTime);
-    document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
-    document.getElementById('taskButtons').style.display = 'block';
-    document.getElementById('breakInput').style.display = 'block';
-  }
-  if (saved.endTime) {
-    endTime = new Date(saved.endTime);
-    document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
-  }
-  taskHistory = saved.taskHistory || {};
-  breakMinutes = saved.breakMinutes || 0;
-  if (breakMinutes) {
-    document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
-  }
-  showTaskSummary();
-}
-
-function showRecord(dateStr) {
-  const saved = JSON.parse(localStorage.getItem(`yui_${dateStr}`));
-  document.getElementById('selectedRecord').style.display = 'block';
-  document.getElementById('selectedDate').innerText = `日付: ${dateStr}`;
-  if (!saved) {
-    document.getElementById('selectedDetails').innerHTML = '<p>記録なし</p>';
-    return;
-  }
-  let html = "<ul>";
-  for (const task in saved.taskHistory) {
-    html += `<li>${task}: ${saved.taskHistory[task].toFixed(2)}時間</li>`;
-  }
-  html += `</ul><p>休憩時間: ${saved.breakMinutes || 0} 分</p>`;
-  document.getElementById('selectedDetails').innerHTML = html;
-}
-
-function drawWeeklyWorkChart() {
-  const taskTypes = ['外来', '病棟', '手術', '救急', '事務'];
-  const colors = {
-    '外来': 'rgba(54, 162, 235, 0.7)',
-    '病棟': 'rgba(75, 192, 192, 0.7)',
-    '手術': 'rgba(255, 159, 64, 0.7)',
-    '救急': 'rgba(255, 99, 132, 0.7)',
-    '事務': 'rgba(153, 102, 255, 0.7)'
-  };
-
-  const labels = [];
-  const datasets = taskTypes.map(task => ({
-    label: task,
-    data: [],
-    backgroundColor: colors[task]
-  }));
-
-  let totalWeekHours = 0;
-
-  const today = new Date();
-  for (let d = 6; d >= 0; d--) {
-    const date = new Date(today);
-    date.setDate(today.getDate() - d);
-    const dateStr = date.toISOString().split('T')[0];
-    labels.push(dateStr);
-
-    const saved = JSON.parse(localStorage.getItem(`yui_${dateStr}`)) || { taskHistory: {} };
-    let dayTotal = 0;
-    taskTypes.forEach((task, index) => {
-      const hours = saved.taskHistory[task] || 0;
-      datasets[index].data.push(hours.toFixed(2));
-      dayTotal += hours;
-    });
-    totalWeekHours += dayTotal;
-  }
-
-  const averageHours = (totalWeekHours / 7).toFixed(2);
-
-  if (workChart) workChart.destroy();
-
-  const ctx = document.getElementById('weeklyWorkChart').getContext('2d');
-  workChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: datasets
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { position: 'top' },
-        title: {
-          display: true,
-          text: `1日あたりの平均勤務時間：${averageHours}時間`
-        }
-      },
-      scales: {
-        x: { stacked: true },
-        y: { stacked: true, beginAtZero: true }
-      }
+  // ユーザーの状態を監視
+  auth.onAuthStateChanged((user) => {
+    if (user) {
+      document.getElementById("loginBox").style.display = "none";
+      document.getElementById("appContainer").style.display = "block";
+      document.body.style.display = "flex";
+      initApp();
+    } else {
+      document.getElementById("loginBox").style.display = "block";
+      document.body.style.display = "flex";
     }
   });
-}
+
+  function login() {
+    const email = document.getElementById("email").value;
+    const pw = document.getElementById("password").value;
+    auth.signInWithEmailAndPassword(email, pw)
+      .catch(err => alert("ログイン失敗: " + err.message));
+  }
+
+  function signup() {
+    const email = document.getElementById("email").value;
+    const pw = document.getElementById("password").value;
+    auth.createUserWithEmailAndPassword(email, pw)
+      .catch(err => alert("登録失敗: " + err.message));
+  }
+
+  function initApp() {
+    console.log("ログイン成功、アプリ起動！");
+
+    // Firebaseデータ取得やカレンダー・グラフ描画をここで呼び出す
+    // loadTodayData();
+    // drawWeeklyWorkChart();
+    // drawMonthlyWorkChart();
+  }
 </script>
-
 </body>
 </html>
