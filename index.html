@@ -99,6 +99,11 @@
   <p id="workDuration">総勤務時間: -</p>
 </div>
 
+<div id="history" class="box">
+  <h2>過去の勤務履歴</h2>
+  <ul id="historyList"></ul>
+</div>
+
 <script>
   let startTime = null;
   let endTime = null;
@@ -109,15 +114,21 @@
   const taskButtons = document.querySelectorAll('#taskButtons button');
 
   window.onload = () => {
-    loadSavedData();
+    loadTodayData();
+    loadHistory();
   };
+
+  function getTodayKey() {
+    const today = new Date();
+    return today.toISOString().split('T')[0]; // 例: "2025-04-29"
+  }
 
   document.getElementById('clockInBtn').onclick = () => {
     startTime = new Date();
     document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
     document.getElementById('taskButtons').style.display = 'block';
     document.getElementById('breakInput').style.display = 'block';
-    saveData();
+    saveTodayData();
   };
 
   document.getElementById('clockOutBtn').onclick = () => {
@@ -129,7 +140,8 @@
     document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
     if (currentTask) recordTaskTime(currentTask);
     showTaskSummary();
-    saveData();
+    saveTodayData();
+    loadHistory();
   };
 
   function startTask(taskName, btn) {
@@ -138,7 +150,7 @@
     currentTaskStart = new Date();
     taskButtons.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    saveData();
+    saveTodayData();
   }
 
   function recordTaskTime(taskName) {
@@ -151,7 +163,7 @@
   function setBreakTime() {
     breakMinutes = parseInt(document.getElementById('breakMinutes').value) || 0;
     document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
-    saveData();
+    saveTodayData();
   }
 
   function showTaskSummary() {
@@ -168,16 +180,19 @@
     document.getElementById('workDuration').innerText = `総勤務時間: ${total.toFixed(2)} 時間（休憩引いた後）`;
   }
 
-  function saveData() {
-    localStorage.setItem('yuiWorkData', JSON.stringify({
+  function saveTodayData() {
+    const key = getTodayKey();
+    const data = {
       startTime: startTime ? startTime.toISOString() : null,
       endTime: endTime ? endTime.toISOString() : null,
       taskHistory, breakMinutes
-    }));
+    };
+    localStorage.setItem(`yui_${key}`, JSON.stringify(data));
   }
 
-  function loadSavedData() {
-    const saved = JSON.parse(localStorage.getItem('yuiWorkData'));
+  function loadTodayData() {
+    const key = getTodayKey();
+    const saved = JSON.parse(localStorage.getItem(`yui_${key}`));
     if (!saved) return;
     if (saved.startTime) {
       startTime = new Date(saved.startTime);
@@ -195,6 +210,20 @@
       document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
     }
     showTaskSummary();
+  }
+
+  function loadHistory() {
+    const historyList = document.getElementById('historyList');
+    historyList.innerHTML = '';
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key.startsWith('yui_')) {
+        const date = key.replace('yui_', '');
+        const li = document.createElement('li');
+        li.innerText = date;
+        historyList.appendChild(li);
+      }
+    }
   }
 </script>
 
