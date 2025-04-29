@@ -21,19 +21,71 @@
       font-size: 28px;
       margin-bottom: 10px;
     }
-    #calendar {
-      max-width: 90%;
-      margin-top: 20px;
+    #buttonRow {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin-top: 10px;
     }
-    #record {
-      margin-top: 20px;
-      padding: 20px;
+    #clockInBtn, #clockOutBtn {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      font-size: 16px;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 1px 1px 4px rgba(0,0,0,0.2);
+      border: none;
+      cursor: pointer;
+    }
+    #clockInBtn {
+      background-color: #4caf50;
+      color: white;
+    }
+    #clockOutBtn {
+      background-color: #f44336;
+      color: white;
+    }
+    #taskButtons button {
+      background-color: #03a9f4;
+      color: white;
+      margin: 5px 0;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 300px;
+    }
+    #taskButtons button.active {
+      background-color: #0288d1;
+    }
+    input {
+      padding: 10px;
+      font-size: 16px;
+      width: 90%;
+      max-width: 200px;
+    }
+    .box {
+      margin-top: 16px;
+      padding: 16px;
       background: white;
       border-radius: 10px;
-      box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+      box-shadow: 1px 1px 6px rgba(0,0,0,0.1);
       width: 90%;
       max-width: 400px;
       text-align: center;
+    }
+    ul {
+      text-align: left;
+      margin-top: 10px;
+      padding-left: 1em;
+    }
+    #calendar {
+      margin-top: 20px;
+      width: 90%;
+      max-width: 600px;
     }
   </style>
 </head>
@@ -41,22 +93,65 @@
 
 <h1>勤務記録 Yui</h1>
 
-<div id="calendar"></div>
+<div id="buttonRow">
+  <button id="clockInBtn">出勤</button>
+  <button id="clockOutBtn">退勤</button>
+</div>
 
-<div id="record">
-  <h2>勤務記録</h2>
-  <p id="recordDate">日付: -</p>
-  <p id="workDuration">勤務時間: -</p>
-  <p id="breakTime">休憩時間: -</p>
+<div id="taskButtons" class="box" style="display:none;">
+  <h2>仕事内容選択</h2>
+  <button onclick="startTask('外来', this)">外来</button>
+  <button onclick="startTask('病棟', this)">病棟</button>
+  <button onclick="startTask('手術', this)">手術</button>
+  <button onclick="startTask('救急', this)">救急</button>
+  <button onclick="startTask('事務', this)">事務</button>
+</div>
+
+<div id="breakInput" class="box" style="display:none;">
+  <h2>休憩時間</h2>
+  <input type="number" id="breakMinutes" placeholder="休憩（分）">
+  <button onclick="setBreakTime()">休憩時間を記録</button>
+</div>
+
+<div id="record" class="box">
+  <h2>今日の勤務記録</h2>
+  <p id="startTime">出勤時間: -</p>
+  <p id="endTime">退勤時間: -</p>
   <div id="taskLog"></div>
+  <p id="breakTime">休憩時間: -</p>
+  <p id="workDuration">総勤務時間: -</p>
+</div>
+
+<div id="calendar" class="box"></div>
+
+<div id="selectedRecord" class="box" style="display:none;">
+  <h2>選択した日の記録</h2>
+  <p id="selectedDate">日付: -</p>
+  <div id="selectedDetails"></div>
 </div>
 
 <script>
+  let startTime = null;
+  let endTime = null;
+  let currentTask = null;
+  let currentTaskStart = null;
+  let taskHistory = {};
+  let breakMinutes = 0;
+  const taskButtons = document.querySelectorAll('#taskButtons button');
   let calendar;
 
   document.addEventListener('DOMContentLoaded', function() {
-    const calendarEl = document.getElementById('calendar');
+    initCalendar();
+    loadTodayData();
+  });
 
+  function getTodayKey() {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  }
+
+  function initCalendar() {
+    const calendarEl = document.getElementById('calendar');
     calendar = new FullCalendar.Calendar(calendarEl, {
       initialView: 'dayGridMonth',
       locale: 'ja',
@@ -70,9 +165,8 @@
       },
       events: loadEvents()
     });
-
     calendar.render();
-  });
+  }
 
   function loadEvents() {
     const events = [];
@@ -89,35 +183,112 @@
     return events;
   }
 
-  function showRecord(dateStr) {
-    const saved = JSON.parse(localStorage.getItem(`yui_${dateStr}`));
-    if (!saved) {
-      document.getElementById('recordDate').innerText = `日付: ${dateStr}`;
-      document.getElementById('workDuration').innerText = `勤務時間: -`;
-      document.getElementById('breakTime').innerText = `休憩時間: -`;
-      document.getElementById('taskLog').innerHTML = '<p>記録なし</p>';
+  document.getElementById('clockInBtn').onclick = () => {
+    startTime = new Date();
+    document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
+    document.getElementById('taskButtons').style.display = 'block';
+    document.getElementById('breakInput').style.display = 'block';
+    saveTodayData();
+  };
+
+  document.getElementById('clockOutBtn').onclick = () => {
+    if (!startTime) {
+      alert('まず出勤ボタンを押してください！');
       return;
     }
+    endTime = new Date();
+    document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
+    if (currentTask) recordTaskTime(currentTask);
+    showTaskSummary();
+    saveTodayData();
+    calendar.removeAllEvents();
+    calendar.addEventSource(loadEvents());
+  };
 
-    let totalHours = 0;
-    for (const task in saved.taskHistory) {
-      totalHours += saved.taskHistory[task];
-    }
-    totalHours -= (saved.breakMinutes || 0) / 60;
+  function startTask(taskName, btn) {
+    if (currentTask) recordTaskTime(currentTask);
+    currentTask = taskName;
+    currentTaskStart = new Date();
+    taskButtons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    saveTodayData();
+  }
 
+  function recordTaskTime(taskName) {
+    const now = new Date();
+    const diffHrs = (now - currentTaskStart) / (1000 * 60 * 60);
+    if (!taskHistory[taskName]) taskHistory[taskName] = 0;
+    taskHistory[taskName] += diffHrs;
+  }
+
+  function setBreakTime() {
+    breakMinutes = parseInt(document.getElementById('breakMinutes').value) || 0;
+    document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
+    saveTodayData();
+  }
+
+  function showTaskSummary() {
     let html = "<h3>仕事内容ごとの勤務時間</h3><ul>";
+    let total = 0;
+    for (const task in taskHistory) {
+      const hours = taskHistory[task].toFixed(2);
+      html += `<li>${task}: ${hours}時間</li>`;
+      total += parseFloat(hours);
+    }
+    html += "</ul>";
+    total -= breakMinutes / 60;
+    document.getElementById('taskLog').innerHTML = html;
+    document.getElementById('workDuration').innerText = `総勤務時間: ${total.toFixed(2)} 時間（休憩引いた後）`;
+  }
+
+  function saveTodayData() {
+    const key = getTodayKey();
+    const data = {
+      startTime: startTime ? startTime.toISOString() : null,
+      endTime: endTime ? endTime.toISOString() : null,
+      taskHistory, breakMinutes
+    };
+    localStorage.setItem(`yui_${key}`, JSON.stringify(data));
+  }
+
+  function loadTodayData() {
+    const key = getTodayKey();
+    const saved = JSON.parse(localStorage.getItem(`yui_${key}`));
+    if (!saved) return;
+    if (saved.startTime) {
+      startTime = new Date(saved.startTime);
+      document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
+      document.getElementById('taskButtons').style.display = 'block';
+      document.getElementById('breakInput').style.display = 'block';
+    }
+    if (saved.endTime) {
+      endTime = new Date(saved.endTime);
+      document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
+    }
+    taskHistory = saved.taskHistory || {};
+    breakMinutes = saved.breakMinutes || 0;
+    if (breakMinutes) {
+      document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
+    }
+    showTaskSummary();
+  }
+
+  function showRecord(dateStr) {
+    const saved = JSON.parse(localStorage.getItem(`yui_${dateStr}`));
+    document.getElementById('selectedRecord').style.display = 'block';
+    document.getElementById('selectedDate').innerText = `日付: ${dateStr}`;
+    if (!saved) {
+      document.getElementById('selectedDetails').innerHTML = '<p>記録なし</p>';
+      return;
+    }
+    let html = "<ul>";
     for (const task in saved.taskHistory) {
       html += `<li>${task}: ${saved.taskHistory[task].toFixed(2)}時間</li>`;
     }
-    html += "</ul>";
-
-    document.getElementById('recordDate').innerText = `日付: ${dateStr}`;
-    document.getElementById('workDuration').innerText = `勤務時間: ${totalHours.toFixed(2)} 時間`;
-    document.getElementById('breakTime').innerText = `休憩時間: ${saved.breakMinutes || 0} 分`;
-    document.getElementById('taskLog').innerHTML = html;
+    html += `</ul><p>休憩時間: ${saved.breakMinutes || 0} 分</p>`;
+    document.getElementById('selectedDetails').innerHTML = html;
   }
 </script>
 
 </body>
 </html>
-
