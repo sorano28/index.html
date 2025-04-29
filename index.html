@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>勤務記録アプリ Yui カレンダー版</title>
+  <title>勤務記録アプリ Yui 最強版</title>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       font-family: 'Zen Maru Gothic', sans-serif;
@@ -87,6 +88,11 @@
       width: 90%;
       max-width: 600px;
     }
+    canvas {
+      margin-top: 30px;
+      width: 90%;
+      max-width: 600px;
+    }
   </style>
 </head>
 <body>
@@ -130,164 +136,219 @@
   <div id="selectedDetails"></div>
 </div>
 
+<canvas id="weeklyWorkChart"></canvas>
+
 <script>
-  let startTime = null;
-  let endTime = null;
-  let currentTask = null;
-  let currentTaskStart = null;
-  let taskHistory = {};
-  let breakMinutes = 0;
-  const taskButtons = document.querySelectorAll('#taskButtons button');
-  let calendar;
+let startTime = null;
+let endTime = null;
+let currentTask = null;
+let currentTaskStart = null;
+let taskHistory = {};
+let breakMinutes = 0;
+const taskButtons = document.querySelectorAll('#taskButtons button');
+let calendar;
+let workChart;
 
-  document.addEventListener('DOMContentLoaded', function() {
-    initCalendar();
-    loadTodayData();
+document.addEventListener('DOMContentLoaded', function() {
+  initCalendar();
+  loadTodayData();
+  drawWeeklyWorkChart();
+});
+
+function getTodayKey() {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+}
+
+function initCalendar() {
+  const calendarEl = document.getElementById('calendar');
+  calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'dayGridMonth',
+    locale: 'ja',
+    headerToolbar: {
+      left: 'prev,next today',
+      center: 'title',
+      right: ''
+    },
+    dateClick: function(info) {
+      showRecord(info.dateStr);
+    },
+    events: loadEvents()
   });
+  calendar.render();
+}
 
-  function getTodayKey() {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  }
-
-  function initCalendar() {
-    const calendarEl = document.getElementById('calendar');
-    calendar = new FullCalendar.Calendar(calendarEl, {
-      initialView: 'dayGridMonth',
-      locale: 'ja',
-      headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: ''
-      },
-      dateClick: function(info) {
-        showRecord(info.dateStr);
-      },
-      events: loadEvents()
-    });
-    calendar.render();
-  }
-
-  function loadEvents() {
-    const events = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key.startsWith('yui_')) {
-        const date = key.replace('yui_', '');
-        events.push({
-          title: '勤務あり',
-          start: date
-        });
-      }
+function loadEvents() {
+  const events = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith('yui_')) {
+      const date = key.replace('yui_', '');
+      events.push({ title: '勤務あり', start: date });
     }
-    return events;
   }
+  return events;
+}
 
-  document.getElementById('clockInBtn').onclick = () => {
-    startTime = new Date();
+document.getElementById('clockInBtn').onclick = () => {
+  startTime = new Date();
+  document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
+  document.getElementById('taskButtons').style.display = 'block';
+  document.getElementById('breakInput').style.display = 'block';
+  saveTodayData();
+};
+
+document.getElementById('clockOutBtn').onclick = () => {
+  if (!startTime) {
+    alert('まず出勤ボタンを押してください！');
+    return;
+  }
+  endTime = new Date();
+  document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
+  if (currentTask) recordTaskTime(currentTask);
+  showTaskSummary();
+  saveTodayData();
+  calendar.removeAllEvents();
+  calendar.addEventSource(loadEvents());
+  drawWeeklyWorkChart();
+};
+
+function startTask(taskName, btn) {
+  if (currentTask) recordTaskTime(currentTask);
+  currentTask = taskName;
+  currentTaskStart = new Date();
+  taskButtons.forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  saveTodayData();
+}
+
+function recordTaskTime(taskName) {
+  const now = new Date();
+  const diffHrs = (now - currentTaskStart) / (1000 * 60 * 60);
+  if (!taskHistory[taskName]) taskHistory[taskName] = 0;
+  taskHistory[taskName] += diffHrs;
+}
+
+function setBreakTime() {
+  breakMinutes = parseInt(document.getElementById('breakMinutes').value) || 0;
+  document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
+  saveTodayData();
+}
+
+function showTaskSummary() {
+  let html = "<h3>仕事内容ごとの勤務時間</h3><ul>";
+  let total = 0;
+  for (const task in taskHistory) {
+    const hours = taskHistory[task].toFixed(2);
+    html += `<li>${task}: ${hours}時間</li>`;
+    total += parseFloat(hours);
+  }
+  html += "</ul>";
+  total -= breakMinutes / 60;
+  document.getElementById('taskLog').innerHTML = html;
+  document.getElementById('workDuration').innerText = `総勤務時間: ${total.toFixed(2)} 時間（休憩引いた後）`;
+}
+
+function saveTodayData() {
+  const key = getTodayKey();
+  const data = {
+    startTime: startTime ? startTime.toISOString() : null,
+    endTime: endTime ? endTime.toISOString() : null,
+    taskHistory, breakMinutes
+  };
+  localStorage.setItem(`yui_${key}`, JSON.stringify(data));
+}
+
+function loadTodayData() {
+  const key = getTodayKey();
+  const saved = JSON.parse(localStorage.getItem(`yui_${key}`));
+  if (!saved) return;
+  if (saved.startTime) {
+    startTime = new Date(saved.startTime);
     document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
     document.getElementById('taskButtons').style.display = 'block';
     document.getElementById('breakInput').style.display = 'block';
-    saveTodayData();
-  };
-
-  document.getElementById('clockOutBtn').onclick = () => {
-    if (!startTime) {
-      alert('まず出勤ボタンを押してください！');
-      return;
-    }
-    endTime = new Date();
+  }
+  if (saved.endTime) {
+    endTime = new Date(saved.endTime);
     document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
-    if (currentTask) recordTaskTime(currentTask);
-    showTaskSummary();
-    saveTodayData();
-    calendar.removeAllEvents();
-    calendar.addEventSource(loadEvents());
+  }
+  taskHistory = saved.taskHistory || {};
+  breakMinutes = saved.breakMinutes || 0;
+  if (breakMinutes) {
+    document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
+  }
+  showTaskSummary();
+}
+
+function showRecord(dateStr) {
+  const saved = JSON.parse(localStorage.getItem(`yui_${dateStr}`));
+  document.getElementById('selectedRecord').style.display = 'block';
+  document.getElementById('selectedDate').innerText = `日付: ${dateStr}`;
+  if (!saved) {
+    document.getElementById('selectedDetails').innerHTML = '<p>記録なし</p>';
+    return;
+  }
+  let html = "<ul>";
+  for (const task in saved.taskHistory) {
+    html += `<li>${task}: ${saved.taskHistory[task].toFixed(2)}時間</li>`;
+  }
+  html += `</ul><p>休憩時間: ${saved.breakMinutes || 0} 分</p>`;
+  document.getElementById('selectedDetails').innerHTML = html;
+}
+
+function drawWeeklyWorkChart() {
+  const taskTypes = ['外来', '病棟', '手術', '救急', '事務'];
+  const colors = {
+    '外来': 'rgba(54, 162, 235, 0.7)',
+    '病棟': 'rgba(75, 192, 192, 0.7)',
+    '手術': 'rgba(255, 159, 64, 0.7)',
+    '救急': 'rgba(255, 99, 132, 0.7)',
+    '事務': 'rgba(153, 102, 255, 0.7)'
   };
 
-  function startTask(taskName, btn) {
-    if (currentTask) recordTaskTime(currentTask);
-    currentTask = taskName;
-    currentTaskStart = new Date();
-    taskButtons.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    saveTodayData();
+  const labels = [];
+  const datasets = taskTypes.map(task => ({
+    label: task,
+    data: [],
+    backgroundColor: colors[task]
+  }));
+
+  const today = new Date();
+  for (let d = 6; d >= 0; d--) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - d);
+    const dateStr = date.toISOString().split('T')[0];
+    labels.push(dateStr);
+
+    const saved = JSON.parse(localStorage.getItem(`yui_${dateStr}`)) || { taskHistory: {} };
+    taskTypes.forEach((task, index) => {
+      const hours = saved.taskHistory[task] || 0;
+      datasets[index].data.push(hours.toFixed(2));
+    });
   }
 
-  function recordTaskTime(taskName) {
-    const now = new Date();
-    const diffHrs = (now - currentTaskStart) / (1000 * 60 * 60);
-    if (!taskHistory[taskName]) taskHistory[taskName] = 0;
-    taskHistory[taskName] += diffHrs;
-  }
+  if (workChart) workChart.destroy();
 
-  function setBreakTime() {
-    breakMinutes = parseInt(document.getElementById('breakMinutes').value) || 0;
-    document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
-    saveTodayData();
-  }
-
-  function showTaskSummary() {
-    let html = "<h3>仕事内容ごとの勤務時間</h3><ul>";
-    let total = 0;
-    for (const task in taskHistory) {
-      const hours = taskHistory[task].toFixed(2);
-      html += `<li>${task}: ${hours}時間</li>`;
-      total += parseFloat(hours);
+  const ctx = document.getElementById('weeklyWorkChart').getContext('2d');
+  workChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' }
+      },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true }
+      }
     }
-    html += "</ul>";
-    total -= breakMinutes / 60;
-    document.getElementById('taskLog').innerHTML = html;
-    document.getElementById('workDuration').innerText = `総勤務時間: ${total.toFixed(2)} 時間（休憩引いた後）`;
-  }
-
-  function saveTodayData() {
-    const key = getTodayKey();
-    const data = {
-      startTime: startTime ? startTime.toISOString() : null,
-      endTime: endTime ? endTime.toISOString() : null,
-      taskHistory, breakMinutes
-    };
-    localStorage.setItem(`yui_${key}`, JSON.stringify(data));
-  }
-
-  function loadTodayData() {
-    const key = getTodayKey();
-    const saved = JSON.parse(localStorage.getItem(`yui_${key}`));
-    if (!saved) return;
-    if (saved.startTime) {
-      startTime = new Date(saved.startTime);
-      document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
-      document.getElementById('taskButtons').style.display = 'block';
-      document.getElementById('breakInput').style.display = 'block';
-    }
-    if (saved.endTime) {
-      endTime = new Date(saved.endTime);
-      document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
-    }
-    taskHistory = saved.taskHistory || {};
-    breakMinutes = saved.breakMinutes || 0;
-    if (breakMinutes) {
-      document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
-    }
-    showTaskSummary();
-  }
-
-  function showRecord(dateStr) {
-    const saved = JSON.parse(localStorage.getItem(`yui_${dateStr}`));
-    document.getElementById('selectedRecord').style.display = 'block';
-    document.getElementById('selectedDate').innerText = `日付: ${dateStr}`;
-    if (!saved) {
-      document.getElementById('selectedDetails').innerHTML = '<p>記録なし</p>';
-      return;
-    }
-    let html = "<ul>";
-    for (const task in saved.taskHistory) {
-      html += `<li>${task}: ${saved.taskHistory[task].toFixed(2)}時間</li>`;
-    }
-    html += `</ul><p>休憩時間: ${saved.breakMinutes || 0} 分</p>`;
-    document.getElementById('selectedDetails').innerHTML = html;
-  }
+  });
+}
 </script>
 
 </body>
