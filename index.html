@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>勤務記録アプリ Yui</title>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       font-family: 'Zen Maru Gothic', sans-serif;
@@ -29,6 +30,7 @@
       cursor: pointer;
       box-shadow: 1px 1px 4px rgba(0,0,0,0.2);
       width: 100%;
+      max-width: 300px;
     }
     #clockInBtn {
       background-color: #4caf50;
@@ -66,6 +68,11 @@
       margin-top: 10px;
       padding-left: 1em;
     }
+    canvas {
+      margin-top: 20px;
+      width: 100%;
+      max-width: 400px;
+    }
   </style>
 </head>
 <body>
@@ -99,9 +106,9 @@
   <p id="workDuration">総勤務時間: -</p>
 </div>
 
-<div id="history" class="box">
-  <h2>過去の勤務履歴</h2>
-  <ul id="historyList"></ul>
+<div class="box">
+  <h2>過去の勤務グラフ</h2>
+  <canvas id="workChart"></canvas>
 </div>
 
 <script>
@@ -112,15 +119,16 @@
   let taskHistory = {};
   let breakMinutes = 0;
   const taskButtons = document.querySelectorAll('#taskButtons button');
+  let workChart;
 
   window.onload = () => {
     loadTodayData();
-    loadHistory();
+    drawGraph();
   };
 
   function getTodayKey() {
     const today = new Date();
-    return today.toISOString().split('T')[0]; // 例: "2025-04-29"
+    return today.toISOString().split('T')[0];
   }
 
   document.getElementById('clockInBtn').onclick = () => {
@@ -141,7 +149,7 @@
     if (currentTask) recordTaskTime(currentTask);
     showTaskSummary();
     saveTodayData();
-    loadHistory();
+    drawGraph();
   };
 
   function startTask(taskName, btn) {
@@ -212,18 +220,45 @@
     showTaskSummary();
   }
 
-  function loadHistory() {
-    const historyList = document.getElementById('historyList');
-    historyList.innerHTML = '';
+  function drawGraph() {
+    const labels = [];
+    const data = [];
+
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (key.startsWith('yui_')) {
+        const saved = JSON.parse(localStorage.getItem(key));
         const date = key.replace('yui_', '');
-        const li = document.createElement('li');
-        li.innerText = date;
-        historyList.appendChild(li);
+        let totalHours = 0;
+        for (const task in saved.taskHistory) {
+          totalHours += saved.taskHistory[task];
+        }
+        totalHours -= (saved.breakMinutes || 0) / 60;
+        labels.push(date);
+        data.push(totalHours.toFixed(2));
       }
     }
+
+    if (workChart) workChart.destroy();
+
+    const ctx = document.getElementById('workChart').getContext('2d');
+    workChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: '勤務時間（時間）',
+          data: data,
+          backgroundColor: 'rgba(54, 162, 235, 0.7)'
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
   }
 </script>
 
