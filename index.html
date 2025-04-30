@@ -1,20 +1,24 @@
-01:28 sorano <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Yui 勤務記録アプリ 完全版</title>
+  <title>Yui 勤務記録アプリ</title>
 
-  <!-- ライブラリ読み込み -->
-  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- フォント -->
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic&display=swap" rel="stylesheet" />
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
 
+  <!-- カレンダー＆グラフ -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Firebase設定 -->
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyCPIj0_5mQ1sF6oymutLF3DUUaI2Uxw5pA",
@@ -43,8 +47,8 @@
       margin-top: 16px;
       padding: 16px;
       background: white;
-      border-radius: 10px;
-      box-shadow: 1px 1px 6px rgba(0,0,0,0.1);
+      border-radius: 12px;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
       width: 90%;
       max-width: 400px;
       text-align: center;
@@ -69,20 +73,46 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 1px 1px 4px rgba(0,0,0,0.2);
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.2);
       border: none;
       cursor: pointer;
+      transition: all 0.3s ease;
     }
     #clockInBtn { background-color: #4caf50; color: white; }
     #clockOutBtn { background-color: #f44336; color: white; }
+
+    #taskButtons button {
+      margin: 5px;
+      padding: 12px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      color: white;
+    }
+    #taskButtons button:hover {
+      opacity: 0.8;
+    }
+    .activeTask {
+      box-shadow: 0 0 10px 2px rgba(0, 150, 255, 0.7);
+      transform: scale(1.05);
+    }
+
+    .task-outpatient { background-color: #4FC3F7; }
+    .task-ward { background-color: #81C784; }
+    .task-surgery { background-color: #FF8A65; }
+    .task-er { background-color: #E57373; }
+    .task-office { background-color: #BA68C8; }
+
     canvas {
       margin-top: 30px;
       width: 90%;
       max-width: 600px;
     }
   </style>
-</head>
-01:29 sorano <body style="display:none;">
+</head><body style="display:none;">
+
   <!-- ログイン画面 -->
   <div id="loginBox" class="box">
     <h2>Yui ログイン</h2>
@@ -96,30 +126,30 @@
   <div id="appContainer" style="display:none;">
     <h1>Yui 勤務記録アプリ</h1>
 
-    <!-- 出勤・退勤ボタン -->
+    <!-- 出勤・退勤 -->
     <div id="buttonRow">
       <button id="clockInBtn" onclick="clockIn()">出勤</button>
       <button id="clockOutBtn" onclick="clockOut()">退勤</button>
     </div>
 
-    <!-- 仕事内容選択ボタン -->
+    <!-- 仕事内容ボタン -->
     <div id="taskButtons" class="box" style="display:none;">
       <h2>仕事内容を選択</h2>
-      <button onclick="startTask('外来', this)">外来</button>
-      <button onclick="startTask('病棟', this)">病棟</button>
-      <button onclick="startTask('手術', this)">手術</button>
-      <button onclick="startTask('救急', this)">救急</button>
-      <button onclick="startTask('事務', this)">事務</button>
+      <button class="task-outpatient" onclick="startTask('外来', this)">外来</button>
+      <button class="task-ward" onclick="startTask('病棟', this)">病棟</button>
+      <button class="task-surgery" onclick="startTask('手術', this)">手術</button>
+      <button class="task-er" onclick="startTask('救急', this)">救急</button>
+      <button class="task-office" onclick="startTask('事務', this)">事務</button>
     </div>
 
-    <!-- 休憩入力 -->
+    <!-- 休憩時間入力 -->
     <div id="breakInput" class="box" style="display:none;">
-      <h2>休憩時間を入力</h2>
+      <h2>休憩時間</h2>
       <input type="number" id="breakMinutes" placeholder="休憩（分）">
-      <button onclick="setBreakTime()">記録</button>
+      <button onclick="setBreakTime()">休憩時間を記録</button>
     </div>
 
-    <!-- 今日の勤務記録 -->
+    <!-- 今日の記録 -->
     <div id="record" class="box">
       <h2>今日の勤務記録</h2>
       <p id="startTime">出勤時間: -</p>
@@ -136,7 +166,7 @@
     <canvas id="weeklyWorkChart"></canvas>
     <canvas id="monthlyWorkChart"></canvas>
   </div>
-01:31 sorano <script>
+  <script>
   let startTime = null;
   let endTime = null;
   let currentTask = null;
@@ -145,37 +175,35 @@
   let breakMinutes = 0;
   let calendar, workChart;
 
-  // Firebase認証 状態監視
   auth.onAuthStateChanged(user => {
     if (user) {
-      document.getElementById('loginBox').style.display = 'none';
-      document.getElementById('appContainer').style.display = 'block';
-      document.body.style.display = 'flex';
+      document.getElementById("loginBox").style.display = "none";
+      document.getElementById("appContainer").style.display = "block";
+      document.body.style.display = "flex";
       initApp();
     } else {
-      document.getElementById('loginBox').style.display = 'block';
-      document.getElementById('appContainer').style.display = 'none';
-      document.body.style.display = 'flex';
+      document.getElementById("loginBox").style.display = "block";
+      document.getElementById("appContainer").style.display = "none";
+      document.body.style.display = "flex";
     }
   });
 
   function login() {
-    const email = document.getElementById('email').value;
-    const pw = document.getElementById('password').value;
+    const email = document.getElementById("email").value;
+    const pw = document.getElementById("password").value;
     auth.signInWithEmailAndPassword(email, pw)
       .catch(err => alert("ログイン失敗：" + err.message));
   }
 
   function signup() {
-    const email = document.getElementById('email').value;
-    const pw = document.getElementById('password').value;
+    const email = document.getElementById("email").value;
+    const pw = document.getElementById("password").value;
     auth.createUserWithEmailAndPassword(email, pw)
       .catch(err => alert("登録失敗：" + err.message));
   }
 
   function getTodayKey() {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    return new Date().toISOString().split('T')[0];
   }
 
   function clockIn() {
@@ -187,10 +215,7 @@
   }
 
   function clockOut() {
-    if (!startTime) {
-      alert('出勤ボタンを押してね！');
-      return;
-    }
+    if (!startTime) return alert("先に出勤ボタンを押してね！");
     endTime = new Date();
     document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
     if (currentTask) recordTaskTime(currentTask);
@@ -205,59 +230,55 @@
     if (currentTask) recordTaskTime(currentTask);
     currentTask = taskName;
     currentTaskStart = new Date();
-    document.querySelectorAll('#taskButtons button').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+    document.querySelectorAll('#taskButtons button').forEach(b => b.classList.remove('activeTask'));
+    btn.classList.add('activeTask');
     saveTodayData();
   }
 
-  function recordTaskTime(taskName) {
+  function recordTaskTime(task) {
     const now = new Date();
-    const diffHrs = (now - currentTaskStart) / (1000 * 60 * 60);
-    if (!taskHistory[taskName]) taskHistory[taskName] = 0;
-    taskHistory[taskName] += diffHrs;
+    const diff = (now - currentTaskStart) / (1000 * 60 * 60);
+    if (!taskHistory[task]) taskHistory[task] = 0;
+    taskHistory[task] += diff;
   }
 
   function setBreakTime() {
-    breakMinutes = parseInt(document.getElementById('breakMinutes').value) || 0;
-    document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
+    breakMinutes = parseInt(document.getElementById("breakMinutes").value) || 0;
+    document.getElementById("breakTime").innerText = `休憩時間: ${breakMinutes} 分`;
     saveTodayData();
   }
 
   function saveTodayData() {
     const user = auth.currentUser;
     if (!user) return;
-    const key = getTodayKey();
-    const data = {
+    db.collection("users").doc(user.uid).collection("records").doc(getTodayKey()).set({
       startTime: startTime ? startTime.toISOString() : null,
       endTime: endTime ? endTime.toISOString() : null,
-      taskHistory,
-      breakMinutes
-    };
-    db.collection('users').doc(user.uid).collection('records').doc(key).set(data);
+      taskHistory, breakMinutes
+    });
   }
 
   function loadTodayData() {
     const user = auth.currentUser;
     if (!user) return;
-    const key = getTodayKey();
-    db.collection('users').doc(user.uid).collection('records').doc(key)
-      .get().then(doc => {
+    db.collection("users").doc(user.uid).collection("records").doc(getTodayKey()).get()
+      .then(doc => {
         if (!doc.exists) return;
-        const saved = doc.data();
-        if (saved.startTime) {
-          startTime = new Date(saved.startTime);
+        const data = doc.data();
+        if (data.startTime) {
+          startTime = new Date(data.startTime);
           document.getElementById('startTime').innerText = `出勤時間: ${startTime.toLocaleTimeString()}`;
           document.getElementById('taskButtons').style.display = 'block';
           document.getElementById('breakInput').style.display = 'block';
         }
-        if (saved.endTime) {
-          endTime = new Date(saved.endTime);
+        if (data.endTime) {
+          endTime = new Date(data.endTime);
           document.getElementById('endTime').innerText = `退勤時間: ${endTime.toLocaleTimeString()}`;
         }
-        taskHistory = saved.taskHistory || {};
-        breakMinutes = saved.breakMinutes || 0;
+        taskHistory = data.taskHistory || {};
+        breakMinutes = data.breakMinutes || 0;
         if (breakMinutes) {
-          document.getElementById('breakTime').innerText = `休憩時間: ${breakMinutes} 分`;
+          document.getElementById("breakTime").innerText = `休憩時間: ${breakMinutes} 分`;
         }
         showTaskSummary();
       });
@@ -268,30 +289,20 @@
     let total = 0;
     for (const task in taskHistory) {
       const hours = taskHistory[task].toFixed(2);
-      html += `<li>${task}: ${hours}時間</li>`;
+      html += `<li>${task}: ${hours} 時間</li>`;
       total += parseFloat(hours);
     }
     html += "</ul>";
-
-    let autoBreak = 0;
-    if (startTime && endTime && breakMinutes === 0) {
-      const duration = (endTime - startTime) / (1000 * 60 * 60);
-      if (duration >= 6) autoBreak = 60;
-    }
-    const usedBreak = breakMinutes || autoBreak;
-    document.getElementById('taskLog').innerHTML = html;
-    document.getElementById('breakTime').innerText = `休憩時間: ${usedBreak} 分`;
-
+    const usedBreak = breakMinutes || 0;
+    document.getElementById("taskLog").innerHTML = html;
+    document.getElementById("breakTime").innerText = `休憩時間: ${usedBreak} 分`;
     total -= usedBreak / 60;
-    document.getElementById('workDuration').innerText =
-      `総勤務時間: ${total.toFixed(2)} 時間（休憩引いた後）`;
+    document.getElementById("workDuration").innerText = `総勤務時間: ${total.toFixed(2)} 時間`;
   }
 
   function reloadCalendar() {
     calendar.removeAllEvents();
-    loadEvents().then(events => {
-      calendar.addEventSource(events);
-    });
+    loadEvents().then(events => calendar.addEventSource(events));
   }
 
   function initApp() {
@@ -302,17 +313,15 @@
   }
 
   function initCalendar() {
-    const calendarEl = document.getElementById('calendar');
-    calendar = new FullCalendar.Calendar(calendarEl, {
-      initialView: 'dayGridMonth',
-      locale: 'ja',
+    calendar = new FullCalendar.Calendar(document.getElementById("calendar"), {
+      initialView: "dayGridMonth",
+      locale: "ja",
       headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: ''
+        left: "prev,next today",
+        center: "title",
+        right: ""
       }
     });
-
     loadEvents().then(events => {
       calendar.addEventSource(events);
       calendar.render();
@@ -322,17 +331,12 @@
   function loadEvents() {
     const user = auth.currentUser;
     if (!user) return Promise.resolve([]);
-    const events = [];
-    return db.collection('users').doc(user.uid).collection('records')
-      .get()
+    return db.collection("users").doc(user.uid).collection("records").get()
       .then(snapshot => {
-        snapshot.forEach(doc => {
-          events.push({
-            title: '勤務あり',
-            start: doc.id
-          });
-        });
-        return events;
+        return snapshot.docs.map(doc => ({
+          title: "勤務あり",
+          start: doc.id
+        }));
       });
   }
 
@@ -350,54 +354,48 @@
     const labels = [];
     const today = new Date();
     const dates = [];
-    for (let d = 6; d >= 0; d--) {
-      const date = new Date(today);
-      date.setDate(today.getDate() - d);
-      const dateStr = date.toISOString().split('T')[0];
-      labels.push(dateStr);
-      dates.push(dateStr);
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const str = d.toISOString().split('T')[0];
+      labels.push(str);
+      dates.push(str);
     }
 
-    db.collection('users').doc(user.uid).collection('records')
+    db.collection("users").doc(user.uid).collection("records")
       .where(firebase.firestore.FieldPath.documentId(), 'in', dates)
       .get()
       .then(snapshot => {
         const dayMap = {};
-        snapshot.forEach(doc => {
-          dayMap[doc.id] = doc.data();
-        });
-
+        snapshot.forEach(doc => dayMap[doc.id] = doc.data());
         const datasets = taskTypes.map(task => ({
           label: task,
           data: [],
           backgroundColor: colors[task]
         }));
-
-        let totalWeekHours = 0;
+        let totalHours = 0;
         labels.forEach(dateStr => {
           const record = dayMap[dateStr] || { taskHistory: {} };
-          let dayTotal = 0;
-          taskTypes.forEach((task, index) => {
-            const hours = record.taskHistory?.[task] || 0;
-            datasets[index].data.push(hours.toFixed(2));
-            dayTotal += hours;
+          let dailyTotal = 0;
+          taskTypes.forEach((task, i) => {
+            const h = record.taskHistory?.[task] || 0;
+            datasets[i].data.push(h.toFixed(2));
+            dailyTotal += h;
           });
-          totalWeekHours += dayTotal;
+          totalHours += dailyTotal;
         });
-
-        const averageHours = (totalWeekHours / 7).toFixed(2);
-
+        const avg = (totalHours / 7).toFixed(2);
         if (workChart) workChart.destroy();
-        const ctx = document.getElementById('weeklyWorkChart').getContext('2d');
+        const ctx = document.getElementById("weeklyWorkChart").getContext("2d");
         workChart = new Chart(ctx, {
-          type: 'bar',
-          data: { labels: labels, datasets: datasets },
+          type: "bar",
+          data: { labels, datasets },
           options: {
             responsive: true,
             plugins: {
               title: {
                 display: true,
-                text: `1日あたりの平均勤務時間：${averageHours}時間`
+                text: `週平均勤務時間：${avg} 時間`
               }
             },
             scales: {
@@ -413,41 +411,33 @@
     const user = auth.currentUser;
     if (!user) return;
     const taskTypes = ['外来', '病棟', '手術', '救急', '事務'];
-    const totals = {
-      '外来': 0, '病棟': 0, '手術': 0, '救急': 0, '事務': 0
-    };
-    const colors = {
-      '外来': 'rgba(54, 162, 235, 0.7)',
-      '病棟': 'rgba(75, 192, 192, 0.7)',
-      '手術': 'rgba(255, 159, 64, 0.7)',
-      '救急': 'rgba(255, 99, 132, 0.7)',
-      '事務': 'rgba(153, 102, 255, 0.7)'
-    };
-
+    const totals = { '外来': 0, '病棟': 0, '手術': 0, '救急': 0, '事務': 0 };
     const today = new Date();
-    const thisMonth = today.getMonth();
+    const month = today.getMonth();
 
-    db.collection('users').doc(user.uid).collection('records')
-      .get()
+    db.collection("users").doc(user.uid).collection("records").get()
       .then(snapshot => {
         snapshot.forEach(doc => {
-          const date = new Date(doc.id);
-          if (date.getMonth() !== thisMonth) return;
-          const record = doc.data();
-          taskTypes.forEach(task => {
-            totals[task] += record.taskHistory?.[task] || 0;
-          });
+          const d = new Date(doc.id);
+          if (d.getMonth() !== month) return;
+          const data = doc.data();
+          taskTypes.forEach(t => totals[t] += data.taskHistory?.[t] || 0);
         });
-
-        const ctx = document.getElementById('monthlyWorkChart').getContext('2d');
+        const ctx = document.getElementById("monthlyWorkChart").getContext("2d");
         new Chart(ctx, {
-          type: 'bar',
+          type: "bar",
           data: {
             labels: taskTypes,
             datasets: [{
-              label: '月間勤務時間（時間）',
+              label: "月間勤務時間",
               data: taskTypes.map(t => totals[t].toFixed(2)),
-              backgroundColor: taskTypes.map(t => colors[t])
+              backgroundColor: taskTypes.map(t => ({
+                '外来': 'rgba(54, 162, 235, 0.7)',
+                '病棟': 'rgba(75, 192, 192, 0.7)',
+                '手術': 'rgba(255, 159, 64, 0.7)',
+                '救急': 'rgba(255, 99, 132, 0.7)',
+                '事務': 'rgba(153, 102, 255, 0.7)'
+              }[t]))
             }]
           },
           options: {
@@ -455,12 +445,10 @@
             plugins: {
               title: {
                 display: true,
-                text: 'この月の仕事内容別 合計勤務時間'
+                text: "今月の仕事内容別 合計時間"
               }
             },
-            scales: {
-              y: { beginAtZero: true }
-            }
+            scales: { y: { beginAtZero: true } }
           }
         });
       });
